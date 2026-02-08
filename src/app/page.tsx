@@ -1,241 +1,228 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Layout from "@/components/Layout/Layout";
 import GravityWellUpload from "@/components/Input/GravityWellUpload";
 import ControlsPanel, { HandwritingControls } from "@/components/Controls/ControlsPanel";
-import SolutionStream from "@/components/Solver/SolutionStream";
-import PaperPreview from "@/components/Handwriting/PaperPreview";
+import QuestionSidebar, { Question } from "@/components/Input/QuestionSidebar";
+import PaperPreview, { PaperPreviewHandle } from "@/components/Handwriting/PaperPreview";
 import ZeroGravityHero from "@/components/Hero/ZeroGravityHero";
 import FloatingStylus from "@/components/Hero/FloatingStylus";
-import { motion } from "framer-motion";
-import { Download, RefreshCw, Sparkles, ChevronRight } from "lucide-react";
-
-const defaultControls: HandwritingControls = {
-    fontSize: 24,
-    lineSpacing: 1.5,
-    messiness: 40,
-    rotation: 5,
-    inkColor: "#1a365d",
-    paperType: "ruled",
-};
+import { motion, AnimatePresence } from "framer-motion";
+import { Download, RefreshCw, ChevronLeft, ChevronRight, FileDown, Image } from "lucide-react";
+import { exportToPDF, exportToPNG } from "@/lib/exportUtils";
 
 export default function Home() {
-    const [step, setStep] = useState<"input" | "solving" | "result">("input");
-    const [solverSteps, setSolverSteps] = useState<any[]>([]);
-    const [solutionText, setSolutionText] = useState("");
+    const paperRef = useRef<PaperPreviewHandle>(null);
+    const [step, setStep] = useState<"input" | "exam">("input");
     const [file, setFile] = useState<File | null>(null);
-    const [textInput, setTextInput] = useState("");
+    const [questions, setQuestions] = useState<Question[]>([]);
+    const defaultControls: HandwritingControls = {
+        // Style
+        fontFamily: "Caveat",
+        fontSize: 24,
+        inkColor: "#1a365d",
+        messiness: 30,
+        rotation: 5,
+
+        // Spacing
+        lineSpacing: 1.5,
+        wordSpacing: 10,
+        letterSpacing: 2,
+        baselineShift: 2,
+
+        // Paper
+        paperType: "ruled",
+        paperColor: "#FFFEF5"
+    };
     const [controls, setControls] = useState<HandwritingControls>(defaultControls);
 
-    const handleSolve = async () => {
-        if (!file && !textInput) return;
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generatedPages, setGeneratedPages] = useState<string[]>([]); // Content for each page
+    const [currentPage, setCurrentPage] = useState(0);
 
-        setStep("solving");
-        setSolverSteps([]);
-
-        const mockSteps = [
-            "Reading and analyzing question...",
-            "Identifying key concepts...",
-            "Setting up solution framework...",
-            "Calculating step-by-step...",
-            "Verifying final answer...",
-        ];
-
-        for (let i = 0; i < mockSteps.length; i++) {
-            await new Promise(r => setTimeout(r, 800));
-            setSolverSteps(prev => [...prev, { id: i, content: mockSteps[i], isComplete: false }]);
-
-            if (i > 0) {
-                setSolverSteps(prev => prev.map((s, idx) => idx === i - 1 ? { ...s, isComplete: true } : s));
-            }
+    // Mock Question Extraction
+    const handleFileSelect = (uploadedFile: File | null) => {
+        setFile(uploadedFile);
+        if (uploadedFile) {
+            // Simulate extraction
+            setTimeout(() => {
+                setQuestions([
+                    { id: "1", number: "Q1", text: "Derive the equation of motion for a projectile.", selected: true },
+                    { id: "2", number: "Q2", text: "Explain the Second Law of Thermodynamics.", selected: true },
+                    { id: "3", number: "Q3", text: "Calculate the integral of x^2 from 0 to 5.", selected: false },
+                    { id: "4", number: "Q4", text: "Define surface tension and viscosity.", selected: false },
+                ]);
+            }, 1500);
+        } else {
+            setQuestions([]);
         }
-
-        await new Promise(r => setTimeout(r, 800));
-        setSolverSteps(prev => prev.map(s => ({ ...s, isComplete: true })));
-
-        // Exam-style formatted answer
-        const examAnswer = `Given:
-f(x) = x² + 2x
-
-To Find:
-f'(x) = ?
-
-Solution:
-Using the power rule: d/dx(xⁿ) = nxⁿ⁻¹
-
-Step 1: Differentiate x²
-d/dx(x²) = 2x
-
-Step 2: Differentiate 2x
-d/dx(2x) = 2
-
-Step 3: Combine the results
-f'(x) = 2x + 2
-
-Therefore, f'(x) = 2x + 2
-
-Final Answer: f'(x) = 2x + 2`;
-
-        setSolutionText(examAnswer);
-        setStep("result");
     };
 
-    const handleReset = () => {
-        setStep("input");
-        setSolverSteps([]);
-        setSolutionText("");
-        setFile(null);
-        setTextInput("");
+    const toggleQuestion = (id: string) => {
+        setQuestions(prev => prev.map(q => q.id === id ? { ...q, selected: !q.selected } : q));
+    };
+
+    const handleGenerateValues = async () => {
+        setIsGenerating(true);
+
+        // Simulate generation delay
+        await new Promise(r => setTimeout(r, 2000));
+
+        // Generate content for pages
+        const selectedQs = questions.filter(q => q.selected);
+        const pages = [];
+
+        // Simplified pagination: 1 question per page for now
+        for (const q of selectedQs) {
+            const answer = generateMockAnswer(q.text);
+            pages.push(JSON.stringify({ qNum: q.number, qText: q.text, ans: answer }));
+        }
+
+        setGeneratedPages(pages);
+        setCurrentPage(0);
+        setStep("exam");
+        setIsGenerating(false);
+    };
+
+    const generateMockAnswer = (question: string) => {
+        return `Given: Problem statement parameters...
+
+Step 1: Conceptual Understanding
+Analyze the core principles involved.
+
+Step 2: Mathematical Formulation
+Apply the relevant formulas.
+Equation: F = ma
+
+Step 3: Calculation & Derivation
+Substitute values and solve.
+(Detailed calculation steps here...)
+
+Therefore, the result matches theoretical predictions.
+
+Final Answer: The derived value is 42 units.`;
+    };
+
+    const handleDownloadPDF = () => {
+        const canvas = paperRef.current?.getCanvas();
+        if (canvas) {
+            exportToPDF([canvas], "handwritten_notes.pdf");
+        }
+    };
+
+    const handleDownloadPNG = () => {
+        const canvas = paperRef.current?.getCanvas();
+        if (canvas) {
+            exportToPNG(canvas, `page_${currentPage + 1}.png`);
+        }
     };
 
     return (
         <Layout>
-            <div className="space-y-12">
+            <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
 
-                {/* Hero Section */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-center max-w-4xl mx-auto space-y-6"
-                >
-                    <div className="flex items-center justify-center gap-6 mb-6">
-                        <FloatingStylus />
-                        <ZeroGravityHero />
-                    </div>
-
-                    <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
-                        <span className="holo-gradient-text">Antigravity</span>
-                    </h1>
-                    <p className="text-xl text-gray-400 leading-relaxed max-w-2xl mx-auto">
-                        Transform digital documents into authentic handwritten exam solutions
-                    </p>
-                </motion.div>
-
-                {/* Input Stage */}
+                {/* Header (condensed if in exam mode) */}
                 {step === "input" && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="space-y-8"
-                    >
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Gravity Well Upload */}
-                            <div className="lg:col-span-2">
-                                <GravityWellUpload file={file} onFileSelect={setFile} />
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-4 mb-4">
+                        <div className="flex justify-center gap-4"><FloatingStylus /><ZeroGravityHero /></div>
+                        <h1 className="text-4xl font-bold holo-gradient-text">Antigravity Exam Engine</h1>
+                    </motion.div>
+                )}
+
+                <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
+
+                    {/* LEFT SIDEBAR: Controls & Document */}
+                    <div className="lg:col-span-4 flex flex-col gap-4 min-h-0 overflow-y-auto">
+                        {/* Upload Area (Small if file exists) */}
+                        {!file ? (
+                            <GravityWellUpload file={file} onFileSelect={handleFileSelect} />
+                        ) : (
+                            <div className="frosted-panel p-4 rounded-xl flex items-center justify-between">
+                                <span className="font-bold text-paperWhite truncate">{file.name}</span>
+                                <button onClick={() => setFile(null)} className="text-red-400 text-xs">Change</button>
                             </div>
-
-                            {/* Text Input */}
-                            <div className="frosted-panel p-6 rounded-2xl flex flex-col">
-                                <label className="text-sm font-medium text-gray-400 mb-3">Or paste your question</label>
-                                <textarea
-                                    placeholder="Enter your question here..."
-                                    value={textInput}
-                                    onChange={(e) => setTextInput(e.target.value)}
-                                    className="flex-1 w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:border-holoCyan focus:ring-0 transition-all resize-none text-paperWhite placeholder:text-gray-600 min-h-[200px]"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Controls Panel */}
-                        <ControlsPanel controls={controls} onChange={setControls} />
-
-                        {/* Live Preview */}
-                        {(textInput || file) && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: "auto" }}
-                                className="space-y-4"
-                            >
-                                <h3 className="text-xl font-semibold flex items-center gap-2">
-                                    <ChevronRight className="text-holoCyan" />
-                                    Live Preview
-                                </h3>
-                                <PaperPreview
-                                    content={textInput || "Sample text will appear here..."}
-                                    controls={controls}
-                                />
-                            </motion.div>
                         )}
 
-                        {/* Generate Button */}
-                        <motion.button
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={handleSolve}
-                            disabled={!textInput && !file}
-                            className={`relative w-full py-6 rounded-2xl font-bold text-xl transition-all overflow-hidden group ${(!textInput && !file)
-                                    ? "bg-gray-800 text-gray-500 cursor-not-allowed"
-                                    : "holo-gradient gravity-glow-strong text-deepSpace shadow-2xl"
-                                }`}
-                        >
-                            <span className="relative z-10 flex items-center justify-center gap-3">
-                                <Sparkles size={24} />
-                                Generate Handwritten Solution
-                            </span>
-                        </motion.button>
-                    </motion.div>
-                )}
+                        {/* Questions List */}
+                        {file && (
+                            <div className="flex-1 min-h-[300px]">
+                                <QuestionSidebar
+                                    questions={questions}
+                                    onToggleQuestion={toggleQuestion}
+                                    onGenerate={handleGenerateValues}
+                                    isGenerating={isGenerating}
+                                />
+                            </div>
+                        )}
 
-                {/* Solver Stage */}
-                {step === "solving" && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                    >
-                        <SolutionStream steps={solverSteps} isThinking={true} />
-                    </motion.div>
-                )}
+                        {/* Styling Controls */}
+                        <ControlsPanel controls={controls} onChange={setControls} />
+                    </div>
 
-                {/* Result Stage */}
-                {step === "result" && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="space-y-8"
-                    >
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                            {/* AI Solution */}
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-bold">AI Solution</h3>
-                                <div className="frosted-panel p-6 rounded-2xl font-mono text-sm whitespace-pre-wrap text-gray-300 leading-relaxed max-h-[500px] overflow-auto">
-                                    {solutionText}
+                    {/* RIGHT PANEL: Preview / Output */}
+                    <div className="lg:col-span-8 flex flex-col gap-4 min-h-0">
+                        {step === "exam" && generatedPages.length > 0 ? (
+                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1 flex flex-col h-full">
+                                {/* Toolbar */}
+                                <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl mb-2 backdrop-blur-md">
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+                                            disabled={currentPage === 0}
+                                            className="p-2 hover:bg-white/10 rounded-lg disabled:opacity-30"
+                                        >
+                                            <ChevronLeft />
+                                        </button>
+                                        <span className="font-mono font-bold">Page {currentPage + 1} of {generatedPages.length}</span>
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.min(generatedPages.length - 1, p + 1))}
+                                            disabled={currentPage === generatedPages.length - 1}
+                                            className="p-2 hover:bg-white/10 rounded-lg disabled:opacity-30"
+                                        >
+                                            <ChevronRight />
+                                        </button>
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={handleDownloadPNG}
+                                            className="px-4 py-2 bg-holoCyan/20 text-holoCyan rounded-lg hover:bg-holoCyan/30 transition-colors flex items-center gap-2"
+                                            title="Download current page as PNG"
+                                        >
+                                            <Image size={16} /> PNG
+                                        </button>
+                                        <button
+                                            onClick={handleDownloadPDF}
+                                            className="px-4 py-2 holo-gradient text-deepSpace font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                                            title="Download all pages as PDF"
+                                        >
+                                            <FileDown size={16} /> Download PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Writing Canvas */}
+                                <div className="flex-1 overflow-hidden relative bg-gray-800/50 rounded-xl border border-white/10 flex items-center justify-center p-4">
+                                    <PaperPreview
+                                        ref={paperRef}
+                                        content={generatedPages[currentPage]}
+                                        controls={controls}
+                                        isExamMode={true}
+                                    />
+                                </div>
+                            </motion.div>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center border-2 border-dashed border-white/10 rounded-2xl bg-white/5">
+                                <div className="text-center text-gray-500">
+                                    <p className="text-xl font-bold mb-2">Preview Area</p>
+                                    <p>Upload a document and select questions to start.</p>
                                 </div>
                             </div>
+                        )}
+                    </div>
 
-                            {/* Handwritten Preview */}
-                            <div className="space-y-6">
-                                <h3 className="text-2xl font-bold">Handwritten Output</h3>
-                                <PaperPreview content={solutionText} controls={controls} />
-                            </div>
-                        </div>
-
-                        {/* Controls for adjustment */}
-                        <ControlsPanel controls={controls} onChange={setControls} />
-
-                        {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-4">
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className="py-4 holo-gradient rounded-xl font-semibold gravity-glow text-deepSpace transition-all flex items-center justify-center gap-2"
-                            >
-                                <Download size={20} />
-                                Download PDF
-                            </motion.button>
-                            <motion.button
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={handleReset}
-                                className="py-4 frosted-panel rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
-                            >
-                                <RefreshCw size={20} />
-                                New Question
-                            </motion.button>
-                        </div>
-                    </motion.div>
-                )}
-
+                </div>
             </div>
         </Layout>
     );

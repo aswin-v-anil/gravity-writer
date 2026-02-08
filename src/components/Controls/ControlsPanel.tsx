@@ -1,16 +1,26 @@
 "use client";
 
-import React from "react";
-import { motion } from "framer-motion";
-import { Pen, Type, AlignLeft, RotateCcw, Palette, FileText } from "lucide-react";
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Pen, Type, AlignLeft, RotateCcw, Palette, FileText, MoveHorizontal, ArrowUpFromLine, Layers } from "lucide-react";
 
 export interface HandwritingControls {
+    // Handwriting Style
+    fontFamily: string;
     fontSize: number;
-    lineSpacing: number;
+    inkColor: string;
     messiness: number;
     rotation: number;
-    inkColor: string;
-    paperType: "plain" | "ruled" | "grid";
+
+    // Spacing
+    lineSpacing: number;
+    wordSpacing: number;
+    letterSpacing: number;
+    baselineShift: number;
+
+    // Paper
+    paperType: "plain" | "ruled" | "grid" | "vintage";
+    paperColor: string;
 }
 
 interface ControlsPanelProps {
@@ -43,7 +53,7 @@ const Slider = ({
                 <Icon size={14} />
                 {label}
             </div>
-            <span className="text-sm font-medium holo-gradient-text">{value}{unit}</span>
+            <span className="text-sm font-medium holo-gradient-text">{Math.round(value * 10) / 10}{unit}</span>
         </div>
         <input
             type="range"
@@ -61,127 +71,231 @@ const Slider = ({
 );
 
 export default function ControlsPanel({ controls, onChange }: ControlsPanelProps) {
+    const [activeTab, setActiveTab] = useState<"style" | "spacing" | "paper">("style");
+
     const update = (key: keyof HandwritingControls, value: any) => {
         onChange({ ...controls, [key]: value });
     };
 
-    const inkColors = [
-        { name: "Blue", value: "#1a365d" },
-        { name: "Black", value: "#1a1a1a" },
-        { name: "Dark Blue", value: "#0d47a1" },
+    const fonts = [
+        // Casual / Everyday
+        { name: "Caveat (Default)", value: "Caveat" },
+        { name: "Indie Flower", value: "Indie Flower" },
+        { name: "Patrick Hand", value: "Patrick Hand" },
+        { name: "Kalam", value: "Kalam" },
+        { name: "Coming Soon", value: "Coming Soon" },
+        { name: "Reenie Beanie", value: "Reenie Beanie" },
+        { name: "Gloria Hallelujah", value: "Gloria Hallelujah" },
+        { name: "Just Another Hand", value: "Just Another Hand" },
+        { name: "Nothing You Could Do", value: "Nothing You Could Do" },
+        { name: "Covered By Your Grace", value: "Covered By Your Grace" },
+        
+        // Cursive / Elegant
+        { name: "Dancing Script", value: "Dancing Script" },
+        { name: "Shadows Into Light", value: "Shadows Into Light" },
+        { name: "Sacramento", value: "Sacramento" },
+        { name: "Zeyada", value: "Zeyada" },
+        { name: "Homemade Apple", value: "Homemade Apple" },
+        
+        // Bold / Marker
+        { name: "Permanent Marker", value: "Permanent Marker" },
+        { name: "Walter Turncoat", value: "Walter Turncoat" },
+        
+        // Academic / Clean
+        { name: "Architects Daughter", value: "Architects Daughter" },
+        { name: "Schoolbell", value: "Schoolbell" },
+        
+        // Additional Handwriting Fonts
+        { name: "Satisfy", value: "Satisfy" },
+        { name: "Amatic SC", value: "Amatic SC" },
+        { name: "Rock Salt", value: "Rock Salt" },
+        { name: "Handlee", value: "Handlee" },
+        { name: "Gochi Hand", value: "Gochi Hand" },
+        { name: "Bad Script", value: "Bad Script" },
+        { name: "Yellowtail", value: "Yellowtail" },
+        { name: "Loved by the King", value: "Loved by the King" },
     ];
 
     const paperTypes = [
         { name: "Plain", value: "plain" as const },
         { name: "Ruled", value: "ruled" as const },
         { name: "Grid", value: "grid" as const },
+        { name: "Vintage", value: "vintage" as const },
     ];
 
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="frosted-panel p-6 rounded-2xl space-y-6"
-        >
-            <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Pen className="w-5 h-5 text-holoCyan" />
-                Handwriting Controls
-            </h3>
-
-            <div className="space-y-5">
-                {/* Font Size */}
-                <Slider
-                    label="Font Size"
-                    icon={Type}
-                    value={controls.fontSize}
-                    min={16}
-                    max={48}
-                    onChange={(v) => update("fontSize", v)}
-                    unit="px"
-                />
-
-                {/* Line Spacing */}
-                <Slider
-                    label="Line Spacing"
-                    icon={AlignLeft}
-                    value={controls.lineSpacing}
-                    min={1}
-                    max={2.5}
-                    step={0.1}
-                    onChange={(v) => update("lineSpacing", v)}
-                    unit="x"
-                />
-
-                {/* Messiness */}
-                <Slider
-                    label="Messiness"
-                    icon={Pen}
-                    value={controls.messiness}
-                    min={0}
-                    max={100}
-                    onChange={(v) => update("messiness", v)}
-                    unit="%"
-                />
-
-                {/* Rotation */}
-                <Slider
-                    label="Rotation Variance"
-                    icon={RotateCcw}
-                    value={controls.rotation}
-                    min={0}
-                    max={15}
-                    onChange={(v) => update("rotation", v)}
-                    unit="°"
-                />
+        <div className="frosted-panel rounded-2xl overflow-hidden border border-white/10 flex flex-col h-full">
+            {/* Tabs */}
+            <div className="flex border-b border-white/10">
+                {[
+                    { id: "style", icon: Pen, label: "Style" },
+                    { id: "spacing", icon: AlignLeft, label: "Spacing" },
+                    { id: "paper", icon: FileText, label: "Paper" },
+                ].map((tab) => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id as any)}
+                        className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === tab.id
+                                ? "bg-white/10 text-holoCyan border-b-2 border-holoCyan"
+                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                            }`}
+                    >
+                        <tab.icon size={16} />
+                        {tab.label}
+                    </button>
+                ))}
             </div>
 
-            {/* Ink Color */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                    <Palette size={14} />
-                    Ink Color
-                </div>
-                <div className="flex gap-2">
-                    {inkColors.map((color) => (
-                        <motion.button
-                            key={color.value}
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={() => update("inkColor", color.value)}
-                            className={`w-10 h-10 rounded-full border-2 transition-all ${controls.inkColor === color.value
-                                    ? "border-holoCyan gravity-glow"
-                                    : "border-white/20"
-                                }`}
-                            style={{ backgroundColor: color.value }}
-                            title={color.name}
-                        />
-                    ))}
-                </div>
-            </div>
-
-            {/* Paper Type */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-gray-400">
-                    <FileText size={14} />
-                    Paper Type
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                    {paperTypes.map((paper) => (
-                        <motion.button
-                            key={paper.value}
-                            whileHover={{ scale: 1.02 }}
-                            whileTap={{ scale: 0.98 }}
-                            onClick={() => update("paperType", paper.value)}
-                            className={`py-2 px-3 rounded-lg text-sm font-medium transition-all ${controls.paperType === paper.value
-                                    ? "bg-holoCyan/20 border border-holoCyan text-paperWhite"
-                                    : "bg-white/5 border border-white/10 text-gray-400"
-                                }`}
+            {/* Content */}
+            <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
+                <AnimatePresence mode="wait">
+                    {activeTab === "style" && (
+                        <motion.div
+                            key="style"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="space-y-6"
                         >
-                            {paper.name}
-                        </motion.button>
-                    ))}
-                </div>
+                            {/* Font Family */}
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400 flex items-center gap-2">
+                                    <Type size={14} /> Font Style
+                                </label>
+                                <select
+                                    value={controls.fontFamily}
+                                    onChange={(e) => update("fontFamily", e.target.value)}
+                                    className="w-full bg-black/20 border border-white/10 rounded-lg p-2 text-sm text-paperWhite focus:border-holoCyan outline-none"
+                                >
+                                    {fonts.map((f) => (
+                                        <option key={f.value} value={f.value}>{f.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <Slider
+                                label="Font Size"
+                                icon={Type}
+                                value={controls.fontSize}
+                                min={10}
+                                max={100}
+                                onChange={(v) => update("fontSize", v)}
+                                unit="px"
+                            />
+
+                            <Slider
+                                label="Messiness"
+                                icon={Pen}
+                                value={controls.messiness}
+                                min={0}
+                                max={100}
+                                onChange={(v) => update("messiness", v)}
+                                unit="%"
+                            />
+
+                            <Slider
+                                label="Rotation"
+                                icon={RotateCcw}
+                                value={controls.rotation}
+                                min={0}
+                                max={45}
+                                onChange={(v) => update("rotation", v)}
+                                unit="°"
+                            />
+
+                            {/* Ink Color */}
+                            <div className="space-y-2">
+                                <label className="text-sm text-gray-400 flex items-center gap-2">
+                                    <Palette size={14} /> Ink Color
+                                </label>
+                                <input
+                                    type="color"
+                                    value={controls.inkColor}
+                                    onChange={(e) => update("inkColor", e.target.value)}
+                                    className="w-full h-10 rounded-lg cursor-pointer bg-transparent border border-white/10"
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {activeTab === "spacing" && (
+                        <motion.div
+                            key="spacing"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="space-y-6"
+                        >
+                            <Slider
+                                label="Line Spacing"
+                                icon={AlignLeft}
+                                value={controls.lineSpacing}
+                                min={0.5}
+                                max={3.0}
+                                step={0.1}
+                                onChange={(v) => update("lineSpacing", v)}
+                                unit="x"
+                            />
+
+                            <Slider
+                                label="Word Spacing"
+                                icon={MoveHorizontal}
+                                value={controls.wordSpacing}
+                                min={0}
+                                max={50}
+                                onChange={(v) => update("wordSpacing", v)}
+                                unit="px"
+                            />
+
+                            <Slider
+                                label="Letter Spacing"
+                                icon={MoveHorizontal}
+                                value={controls.letterSpacing}
+                                min={-5}
+                                max={20}
+                                onChange={(v) => update("letterSpacing", v)}
+                                unit="px"
+                            />
+
+                            <Slider
+                                label="Baseline Shift"
+                                icon={ArrowUpFromLine}
+                                value={controls.baselineShift}
+                                min={0}
+                                max={20}
+                                onChange={(v) => update("baselineShift", v)}
+                                unit="px"
+                            />
+                        </motion.div>
+                    )}
+
+                    {activeTab === "paper" && (
+                        <motion.div
+                            key="paper"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="space-y-6"
+                        >
+                            <div className="grid grid-cols-2 gap-3">
+                                {paperTypes.map((paper) => (
+                                    <button
+                                        key={paper.value}
+                                        onClick={() => update("paperType", paper.value)}
+                                        className={`py-6 px-3 rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-2 border ${controls.paperType === paper.value
+                                                ? "bg-holoCyan/20 border-holoCyan text-paperWhite shadow-[0_0_15px_rgba(0,217,255,0.3)]"
+                                                : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
+                                            }`}
+                                    >
+                                        <Layers size={20} />
+                                        {paper.name}
+                                    </button>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
-        </motion.div>
+        </div>
     );
 }

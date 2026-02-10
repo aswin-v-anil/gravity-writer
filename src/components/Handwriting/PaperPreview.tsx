@@ -43,6 +43,7 @@ const PaperPreview = forwardRef<PaperPreviewHandle, PaperPreviewProps>(({ conten
 
             perturbation: controls.messiness / 50,
             rotation: controls.rotation,
+            slant: 0,
             baselineShift: controls.baselineShift,
         };
 

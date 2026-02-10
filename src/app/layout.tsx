@@ -1,8 +1,5 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import './globals.css'
-
-const inter = Inter({ subsets: ["latin"] });
+import type { Metadata } from 'next';
+import './globals.css';
 
 export const metadata: Metadata = {
     title: "Gravity: AntiGravity Text to Handwriting",
@@ -23,7 +20,7 @@ export default function RootLayout({
                 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossOrigin="anonymous" />
                 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossOrigin="anonymous"></script>
             </head>
-            <body className={`${inter.className} bg-deepSpace text-paperWhite min-h-screen overflow-x-hidden selection:bg-holoCyan/30`}>
+            <body className={`font-sans bg-deepSpace text-paperWhite min-h-screen overflow-x-hidden selection:bg-holoCyan/30`}>
                 {children}
             </body>
         </html>

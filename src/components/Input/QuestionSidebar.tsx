@@ -4,11 +4,14 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FileText, CheckSquare, Square, ChevronRight, File } from "lucide-react";
 
+import { SubjectDetectionResult } from "@/lib/subjectDetector";
+
 export interface Question {
     id: string;
     number: string;
     text: string;
     selected: boolean;
+    detection?: SubjectDetectionResult;
 }
 
 interface QuestionSidebarProps {
@@ -53,8 +56,8 @@ export default function QuestionSidebar({
                             key={q.id}
                             onClick={() => onToggleQuestion(q.id)}
                             className={`p-3 rounded-xl border cursor-pointer transition-all ${q.selected
-                                    ? "bg-holoCyan/10 border-holoCyan/50"
-                                    : "bg-white/5 border-white/5 hover:bg-white/10"
+                                ? "bg-holoCyan/10 border-holoCyan/50"
+                                : "bg-white/5 border-white/5 hover:bg-white/10"
                                 }`}
                             whileHover={{ scale: 1.01 }}
                             whileTap={{ scale: 0.99 }}
@@ -64,10 +67,17 @@ export default function QuestionSidebar({
                                     {q.selected ? <CheckSquare size={18} /> : <Square size={18} />}
                                 </div>
                                 <div>
-                                    <div className="text-xs font-bold text-gray-400 mb-1">
-                                        {q.number}
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-xs font-bold text-gray-400">
+                                            {q.number}
+                                        </div>
+                                        {q.detection && (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-holoCyan/20 text-holoCyan border border-holoCyan/30">
+                                                {q.detection.subject}
+                                            </span>
+                                        )}
                                     </div>
-                                    <p className="text-sm text-gray-200 line-clamp-3 leading-relaxed">
+                                    <p className="text-sm text-gray-200 line-clamp-3 leading-relaxed mt-1">
                                         {q.text}
                                     </p>
                                 </div>
@@ -90,8 +100,8 @@ export default function QuestionSidebar({
                     onClick={onGenerate}
                     disabled={selectedCount === 0 || isGenerating}
                     className={`w-full py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all ${selectedCount > 0 && !isGenerating
-                            ? "holo-gradient text-deepSpace gravity-glow shadow-lg hover:shadow-holoCyan/20"
-                            : "bg-gray-800 text-gray-500 cursor-not-allowed"
+                        ? "holo-gradient text-deepSpace gravity-glow shadow-lg hover:shadow-holoCyan/20"
+                        : "bg-gray-800 text-gray-500 cursor-not-allowed"
                         }`}
                 >
                     {isGenerating ? (

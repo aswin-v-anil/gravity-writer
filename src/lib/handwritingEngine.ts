@@ -128,7 +128,8 @@ export interface HandwritingStyle {
 
     // Effects
     perturbation: number; // Messiness
-    rotation: number;
+    rotation: number;     // Random rotation range
+    slant: number;        // Constant slant angle (new)
     baselineShift: number; // Random vertical shift
 }
 
@@ -535,7 +536,7 @@ export class HandwritingEngine {
                 const char = word[i];
                 const jitterX = (Math.random() - 0.5) * style.perturbation * 2;
                 const jitterY = (Math.random() - 0.5) * style.perturbation * 2;
-                const rotation = (Math.random() - 0.5) * (style.rotation * Math.PI / 180);
+                const rotation = (style.slant * Math.PI / 180) + (Math.random() - 0.5) * (style.rotation * Math.PI / 180);
                 const baselineNoise = (Math.random() - 0.5) * style.baselineShift;
                 const waveDrift = Math.sin(cursorX / 100) * style.perturbation;
 

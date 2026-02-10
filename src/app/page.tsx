@@ -9,13 +9,16 @@ import PaperPreview, { PaperPreviewHandle } from "@/components/Handwriting/Paper
 import ZeroGravityHero from "@/components/Hero/ZeroGravityHero";
 import FloatingStylus from "@/components/Hero/FloatingStylus";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, RefreshCw, ChevronLeft, ChevronRight, FileDown, Image } from "lucide-react";
+import { Download, RefreshCw, ChevronLeft, ChevronRight, FileDown, Image, Type, Upload } from "lucide-react";
 import { exportToPDF, exportToPNG } from "@/lib/exportUtils";
+import RichTextInput from "@/components/Input/RichTextInput";
 
 export default function Home() {
     const paperRef = useRef<PaperPreviewHandle>(null);
     const [step, setStep] = useState<"input" | "exam">("input");
+    const [inputMode, setInputMode] = useState<"upload" | "write">("write");
     const [file, setFile] = useState<File | null>(null);
+    const [textContent, setTextContent] = useState("");
     const [questions, setQuestions] = useState<Question[]>([]);
     const defaultControls: HandwritingControls = {
         // Style
@@ -33,7 +36,13 @@ export default function Home() {
 
         // Paper
         paperType: "ruled",
-        paperColor: "#FFFEF5"
+        paperColor: "#FFFEF5",
+        marginColor: "#f87171",
+
+        // Effects
+        inkBlur: 0.3,
+        inkFlow: 0.9,
+        paperTexture: 0.15,
     };
     const [controls, setControls] = useState<HandwritingControls>(defaultControls);
 
@@ -41,19 +50,38 @@ export default function Home() {
     const [generatedPages, setGeneratedPages] = useState<string[]>([]); // Content for each page
     const [currentPage, setCurrentPage] = useState(0);
 
-    // Mock Question Extraction
-    const handleFileSelect = (uploadedFile: File | null) => {
+    // Real Question Extraction from File
+    const handleFileSelect = async (uploadedFile: File | null) => {
         setFile(uploadedFile);
         if (uploadedFile) {
-            // Simulate extraction
-            setTimeout(() => {
-                setQuestions([
-                    { id: "1", number: "Q1", text: "Derive the equation of motion for a projectile.", selected: true },
-                    { id: "2", number: "Q2", text: "Explain the Second Law of Thermodynamics.", selected: true },
-                    { id: "3", number: "Q3", text: "Calculate the integral of x^2 from 0 to 5.", selected: false },
-                    { id: "4", number: "Q4", text: "Define surface tension and viscosity.", selected: false },
-                ]);
-            }, 1500);
+            setIsGenerating(true);
+            try {
+                // Dynamically import to avoid SSR issues with pdfjs-dist
+                const { parseDocument } = await import("@/lib/documentParser");
+                const text = await parseDocument(uploadedFile);
+
+                // Split text into paragraphs as "questions"
+                // Heuristic: split by double newlines or number+dot patterns
+                const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 10);
+
+                const newQuestions = paragraphs.map((para, i) => ({
+                    id: `q-${Date.now()}-${i}`,
+                    number: `Q${i + 1}`,
+                    text: para.trim(),
+                    selected: true,
+                }));
+
+                if (newQuestions.length === 0) {
+                    setQuestions([{ id: "empty", number: "Info", text: "No text extracted. Try a different file.", selected: false }]);
+                } else {
+                    setQuestions(newQuestions);
+                }
+            } catch (error) {
+                console.error("Failed to parse file:", error);
+                setQuestions([{ id: "err", number: "Error", text: "Failed to read file content.", selected: false }]);
+            } finally {
+                setIsGenerating(false);
+            }
         } else {
             setQuestions([]);
         }
@@ -126,7 +154,7 @@ Final Answer: The derived value is 42 units.`;
                 {step === "input" && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-4 mb-4">
                         <div className="flex justify-center gap-4"><FloatingStylus /><ZeroGravityHero /></div>
-                        <h1 className="text-4xl font-bold holo-gradient-text">Antigravity Exam Engine</h1>
+                        <h1 className="text-4xl font-bold holo-gradient-text">Gravity: AntiGravity Text to Handwriting</h1>
                     </motion.div>
                 )}
 
@@ -134,30 +162,77 @@ Final Answer: The derived value is 42 units.`;
 
                     {/* LEFT SIDEBAR: Controls & Document */}
                     <div className="lg:col-span-4 flex flex-col gap-4 min-h-0 overflow-y-auto">
-                        {/* Upload Area (Small if file exists) */}
-                        {!file ? (
-                            <GravityWellUpload file={file} onFileSelect={handleFileSelect} />
-                        ) : (
-                            <div className="frosted-panel p-4 rounded-xl flex items-center justify-between">
-                                <span className="font-bold text-paperWhite truncate">{file.name}</span>
-                                <button onClick={() => setFile(null)} className="text-red-400 text-xs">Change</button>
-                            </div>
-                        )}
+                        {/* Input Mode Toggle */}
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setInputMode("write")}
+                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${inputMode === "write"
+                                    ? "bg-holoCyan/20 text-holoCyan border border-holoCyan"
+                                    : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+                                    }`}
+                            >
+                                <Type size={16} />
+                                Write Text
+                            </button>
+                            <button
+                                onClick={() => setInputMode("upload")}
+                                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${inputMode === "upload"
+                                    ? "bg-holoCyan/20 text-holoCyan border border-holoCyan"
+                                    : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"
+                                    }`}
+                            >
+                                <Upload size={16} />
+                                Upload Doc
+                            </button>
+                        </div>
 
-                        {/* Questions List */}
-                        {file && (
-                            <div className="flex-1 min-h-[300px]">
-                                <QuestionSidebar
-                                    questions={questions}
-                                    onToggleQuestion={toggleQuestion}
-                                    onGenerate={handleGenerateValues}
+                        {/* Write Mode: RichTextInput */}
+                        {inputMode === "write" && (
+                            <div className="frosted-panel p-4 rounded-xl">
+                                <RichTextInput
+                                    onGenerate={(content) => {
+                                        setTextContent(content);
+                                        // Generate pages from text content
+                                        setIsGenerating(true);
+                                        setTimeout(() => {
+                                            setGeneratedPages([content]);
+                                            setStep("exam");
+                                            setIsGenerating(false);
+                                        }, 1500);
+                                    }}
                                     isGenerating={isGenerating}
                                 />
                             </div>
                         )}
 
-                        {/* Styling Controls */}
-                        <ControlsPanel controls={controls} onChange={setControls} />
+                        {/* Upload Mode */}
+                        {inputMode === "upload" && (
+                            <>
+                                {!file ? (
+                                    <GravityWellUpload file={file} onFileSelect={handleFileSelect} />
+                                ) : (
+                                    <div className="frosted-panel p-4 rounded-xl flex items-center justify-between">
+                                        <span className="font-bold text-paperWhite truncate">{file.name}</span>
+                                        <button onClick={() => setFile(null)} className="text-red-400 text-xs">Change</button>
+                                    </div>
+                                )}
+
+                                {/* Questions List */}
+                                {inputMode === "upload" && file && (
+                                    <div className="flex-1 min-h-[300px]">
+                                        <QuestionSidebar
+                                            questions={questions}
+                                            onToggleQuestion={toggleQuestion}
+                                            onGenerate={handleGenerateValues}
+                                            isGenerating={isGenerating}
+                                        />
+                                    </div>
+                                )}
+
+                                {/* Styling Controls */}
+                                <ControlsPanel controls={controls} onChange={setControls} />
+                            </>
+                        )}
                     </div>
 
                     {/* RIGHT PANEL: Preview / Output */}
@@ -168,6 +243,7 @@ Final Answer: The derived value is 42 units.`;
                                 <div className="flex items-center justify-between bg-black/40 p-3 rounded-xl mb-2 backdrop-blur-md">
                                     <div className="flex items-center gap-4">
                                         <button
+                                            aria-label="Previous Page"
                                             onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
                                             disabled={currentPage === 0}
                                             className="p-2 hover:bg-white/10 rounded-lg disabled:opacity-30"
@@ -176,6 +252,7 @@ Final Answer: The derived value is 42 units.`;
                                         </button>
                                         <span className="font-mono font-bold">Page {currentPage + 1} of {generatedPages.length}</span>
                                         <button
+                                            aria-label="Next Page"
                                             onClick={() => setCurrentPage(p => Math.min(generatedPages.length - 1, p + 1))}
                                             disabled={currentPage === generatedPages.length - 1}
                                             className="p-2 hover:bg-white/10 rounded-lg disabled:opacity-30"
@@ -221,7 +298,6 @@ Final Answer: The derived value is 42 units.`;
                             </div>
                         )}
                     </div>
-
                 </div>
             </div>
         </Layout>

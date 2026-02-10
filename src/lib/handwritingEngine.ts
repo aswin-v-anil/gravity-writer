@@ -1,3 +1,121 @@
+
+import html2canvas from "html2canvas";
+
+// ========================
+// STABLE-RANDOM PRNG (For deterministic messiness)
+// ========================
+class StableRandom {
+    private pool: Float32Array;
+    private index: number;
+
+    constructor(size: number = 8000) {
+        this.pool = new Float32Array(size);
+        for (let i = 0; i < size; i++) {
+            this.pool[i] = Math.random();
+        }
+        this.index = 0;
+    }
+
+    next(): number {
+        if (this.index >= this.pool.length) this.index = 0;
+        return this.pool[this.index++];
+    }
+
+    reset() {
+        this.index = 0;
+    }
+}
+
+// Global PRNG instance for consistency
+const stableRandom = new StableRandom();
+
+// ========================
+// ADVANCED HANDWRITING SETTINGS (Per Reference Site)
+// ========================
+export interface HWSettings {
+    enabled: boolean;
+
+    // Line Level
+    lineSlopeEnabled: boolean;
+    lineSlopeMax: number; // degrees
+
+    lineSpacingNoiseEnabled: boolean;
+    lineSpacingNoiseMax: number; // px
+
+    lineFontNoiseEnabled: boolean;
+    lineFontNoiseMax: number; // %
+
+    // Word Level
+    wordBaselineEnabled: boolean;
+    wordBaselineMax: number; // px
+
+    wordRotationEnabled: boolean;
+    wordRotationMax: number; // degrees
+
+    wordSpacingNoiseEnabled: boolean;
+    wordSpacingNoiseMax: number; // px
+
+    letterSpacingNoiseEnabled: boolean;
+    letterSpacingNoiseMax: number; // px
+
+    // Ink & Paper Effects
+    inkBlurEnabled: boolean;
+    inkBlurAmount: number; // px
+
+    inkFlowEnabled: boolean;
+    inkFlowAmount: number; // 0-1
+
+    inkShadowEnabled: boolean;
+    inkShadowAmount: number; // px
+
+    paperTextureEnabled: boolean;
+    paperTextureStrength: number; // 0-1
+
+    paperShadowEnabled: boolean;
+    paperShadowStrength: number; // 0-1
+}
+
+// Default HW Settings (Matching Reference Site)
+export const defaultHWSettings: HWSettings = {
+    enabled: true,
+
+    lineSlopeEnabled: true,
+    lineSlopeMax: 2,
+
+    lineSpacingNoiseEnabled: true,
+    lineSpacingNoiseMax: 3,
+
+    lineFontNoiseEnabled: true,
+    lineFontNoiseMax: 2,
+
+    wordBaselineEnabled: true,
+    wordBaselineMax: 2,
+
+    wordRotationEnabled: true,
+    wordRotationMax: 3,
+
+    wordSpacingNoiseEnabled: true,
+    wordSpacingNoiseMax: 3,
+
+    letterSpacingNoiseEnabled: true,
+    letterSpacingNoiseMax: 0.6,
+
+    inkBlurEnabled: true,
+    inkBlurAmount: 0.3,
+
+    inkFlowEnabled: true,
+    inkFlowAmount: 0.9,
+
+    inkShadowEnabled: true,
+    inkShadowAmount: 1,
+
+    paperTextureEnabled: true,
+    paperTextureStrength: 0.18,
+
+    paperShadowEnabled: true,
+    paperShadowStrength: 0.35
+};
+
 export interface HandwritingStyle {
     font: string;
     size: number;
@@ -14,31 +132,49 @@ export interface HandwritingStyle {
     baselineShift: number; // Random vertical shift
 }
 
+
 export interface PageConfig {
     paperType: "plain" | "ruled" | "grid" | "vintage";
     width: number;
     height: number;
     marginLeft: number;
     marginTop: number;
+    paperColor?: string;
+    marginColor?: string;
 }
 
 export class HandwritingEngine {
     private ctx: CanvasRenderingContext2D;
     private width: number;
     private height: number;
+    private tempContainer: HTMLElement; // For LaTeX rendering
 
     constructor(ctx: CanvasRenderingContext2D, width: number, height: number) {
         this.ctx = ctx;
         this.width = width;
         this.height = height;
+
+        // Remove existing temp container if any
+        const existing = document.getElementById('latex-temp-container');
+        if (existing) existing.remove();
+
+        // Create container for KaTeX rendering
+        this.tempContainer = document.createElement('div');
+        this.tempContainer.id = 'latex-temp-container';
+        this.tempContainer.style.position = 'absolute';
+        this.tempContainer.style.left = '-9999px';
+        this.tempContainer.style.top = '-9999px';
+        document.body.appendChild(this.tempContainer);
     }
 
     // Draw paper with different types
     drawPaper(config: PageConfig) {
-        const { paperType, marginLeft } = config;
+        const { paperType, marginLeft, paperColor, marginColor } = config;
 
         // Background Color
-        if (paperType === "vintage") {
+        if (paperColor) {
+            this.ctx.fillStyle = paperColor;
+        } else if (paperType === "vintage") {
             this.ctx.fillStyle = "#f0e6d2"; // Parchment color
         } else {
             this.ctx.fillStyle = "#FFFEF5"; // Off-white
@@ -56,7 +192,7 @@ export class HandwritingEngine {
         }
 
         // Hand-drawn margin line (slightly imperfect)
-        this.drawMarginLine(marginLeft);
+        this.drawMarginLine(marginLeft, marginColor);
     }
 
     private addPaperTexture() {
@@ -116,8 +252,8 @@ export class HandwritingEngine {
         }
     }
 
-    private drawMarginLine(marginLeft: number) {
-        this.ctx.strokeStyle = "#f87171";
+    private drawMarginLine(marginLeft: number, color?: string) {
+        this.ctx.strokeStyle = color || "#f87171";
         this.ctx.lineWidth = 1.5;
         this.ctx.beginPath();
 
@@ -133,11 +269,65 @@ export class HandwritingEngine {
         this.ctx.stroke();
     }
 
-    // Render text with human imperfections
-    renderText(text: string, style: HandwritingStyle, startX: number, startY: number) {
+    async renderLatex(latex: string, x: number, y: number, style: HandwritingStyle, isDisplay: boolean = false): Promise<{ width: number, height: number }> {
+        return new Promise((resolve) => {
+            // Ensure KaTeX is loaded globally
+            if (!(window as any).katex) {
+                console.warn("KaTeX not loaded. Cannot render LaTeX.");
+                resolve({ width: 0, height: 0 });
+                return;
+            }
+
+            try {
+                // Clear previous content in the temporary container
+                this.tempContainer.innerHTML = "";
+                const el = document.createElement('div');
+                // Set font size and color to match the current style
+                // Slightly larger for better readability if display
+                el.style.fontSize = `${style.size * (isDisplay ? 1.2 : 1)}px`;
+                el.style.color = style.color;
+
+                // Render LaTeX to the temporary element using KaTeX
+                (window as any).katex.render(latex, el, {
+                    throwOnError: false,
+                    displayMode: isDisplay
+                });
+                this.tempContainer.appendChild(el);
+
+                // Use html2canvas to convert the rendered LaTeX element to a canvas
+                html2canvas(el, { backgroundColor: null, scale: 2 }).then(canvas => {
+                    const width = canvas.width / 2;
+                    const height = canvas.height / 2;
+
+                    // Draw the rendered LaTeX image onto the main canvas
+                    // If inline, align vertically to baseline (y). If block, center?
+                    // Assuming y is baseline for text. Math usually sits on baseline.
+                    // Adjust: html2canvas captures bounding box.
+                    // For inline, we want to align bottom?
+                    // Let's center vertically around y - height/2 for now.
+                    this.ctx.drawImage(canvas, x, y - height * 0.8, width, height);
+
+                    // Clean up the temporary container
+                    this.tempContainer.innerHTML = "";
+                    resolve({ width, height }); // Resolve with dimensions
+                }).catch(e => {
+                    console.error("html2canvas failed for LaTeX:", e);
+                    this.tempContainer.innerHTML = "";
+                    resolve({ width: 0, height: 0 });
+                });
+            } catch (e) {
+                console.error("Error during KaTeX rendering or conversion:", e);
+                this.tempContainer.innerHTML = "";
+                resolve({ width: 0, height: 0 });
+            }
+        });
+    }
+
+    // Async Render text with human imperfections
+    async renderText(text: string, style: HandwritingStyle, startX: number, startY: number) {
         this.ctx.font = `${style.size}px "${style.font}", cursive`;
         this.ctx.fillStyle = style.color;
-        this.ctx.textBaseline = "alphabetic"; // Better for baseline shift
+        this.ctx.textBaseline = "alphabetic";
 
         const lineHeight = style.size * style.lineHeight;
         const maxWidth = this.width - startX - 40;
@@ -145,65 +335,61 @@ export class HandwritingEngine {
         let cursorX = startX;
         let cursorY = startY;
 
-        // Split by newlines first for exam-style formatting
+        // LaTeX Detection
+        const latexRegex = /\$\$([\s\S]+?)\$\$|\$([\s\S]+?)\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)/g;
+
         const paragraphs = text.split("\n");
 
-        paragraphs.forEach((paragraph) => {
+        for (const paragraph of paragraphs) {
             if (paragraph.trim() === "") {
                 cursorY += lineHeight * 0.5;
-                return;
+                continue;
             }
 
-            const words = paragraph.split(" ");
+            // Check for LaTeX block in paragraph
+            if (paragraph.match(latexRegex)) {
+                // Heuristic: Split by potential latex delimiters
+                const parts = paragraph.split(latexRegex).filter(p => p !== undefined && p !== "");
 
-            words.forEach((word) => {
-                const wordWidth = this.ctx.measureText(word).width + (word.length * style.letterSpacing);
+                for (const part of parts) {
+                    if (part.includes("\\") || part.includes("^") || part.includes("_") || part.includes("{")) {
+                        // Default to inline unless explicitly block? Or treat as block if splitting by newlines?
+                        // renderText assumes parts are mixed. Let's assume inline for snippets.
+                        // But regex split includes delimiters? Yes.
+                        // If checks pass, strip delimiters?
+                        let content = part;
+                        let display = false;
+                        if (content.startsWith('$$')) { content = content.slice(2, -2); display = true; }
+                        else if (content.startsWith('$')) { content = content.slice(1, -1); }
 
-                // Word wrap
-                if (cursorX + wordWidth > startX + maxWidth) {
-                    cursorX = startX;
-                    cursorY += lineHeight;
+                        const { height } = await this.renderLatex(content, cursorX, cursorY, style, display);
+                        cursorY += height + 10;
+                        cursorX = startX;
+                    } else {
+                        // Render plain text part
+                        const res = this.renderWords(part, style, startX, maxWidth, lineHeight, cursorX, cursorY);
+                        cursorX = res.x;
+                        cursorY = res.y;
+                    }
                 }
-
-                // Draw character by character with imperfections
-                for (let i = 0; i < word.length; i++) {
-                    const char = word[i];
-
-                    // Random perturbations based on messiness
-                    const jitterX = (Math.random() - 0.5) * style.perturbation * 2;
-                    const jitterY = (Math.random() - 0.5) * style.perturbation * 2;
-                    const rotation = (Math.random() - 0.5) * (style.rotation * Math.PI / 180);
-
-                    // Baseline drift (cumulative slight movement) + explicit shift
-                    const baselineNoise = (Math.random() - 0.5) * style.baselineShift;
-                    const waveDrift = Math.sin(cursorX / 100) * style.perturbation;
-
-                    this.ctx.save();
-                    this.ctx.translate(cursorX + jitterX, cursorY + jitterY + baselineNoise + waveDrift);
-                    this.ctx.rotate(rotation);
-                    this.ctx.fillText(char, 0, 0);
-                    this.ctx.restore();
-
-                    // Variable character spacing
-                    const charWidth = this.ctx.measureText(char).width;
-                    cursorX += charWidth + style.letterSpacing + (Math.random() * style.perturbation);
-                }
-
-                // Word spacing with variation
-                cursorX += style.wordSpacing + (Math.random() * style.perturbation * 2);
-            });
+            } else {
+                // Standard text rendering
+                const res = this.renderWords(paragraph, style, startX, maxWidth, lineHeight, cursorX, cursorY);
+                cursorX = res.x;
+                cursorY = res.y;
+            }
 
             // New line after paragraph
             cursorX = startX;
             cursorY += lineHeight;
-        });
+        }
 
-        return cursorY; // Return final Y position for multi-page support
+        return cursorY;
     }
 
 
-    // NEW: Rich Text Rendering
-    renderRichText(text: string, style: HandwritingStyle, startX: number, startY: number) {
+    // NEW: Async Rich Text Rendering
+    async renderRichText(text: string, style: HandwritingStyle, startX: number, startY: number) {
         this.ctx.textBaseline = "alphabetic";
         const lineHeight = style.size * style.lineHeight;
         const maxWidth = this.width - startX - 40;
@@ -213,7 +399,7 @@ export class HandwritingEngine {
 
         const lines = text.split("\n");
 
-        lines.forEach((line) => {
+        for (const line of lines) {
             // List detection
             let cleanLine = line;
             let isList = false;
@@ -233,38 +419,63 @@ export class HandwritingEngine {
                 const match = line.trim().match(/^(\d+)\.\s/);
                 if (match) {
                     cleanLine = line.trim().substring(match[0].length);
-                    this.renderText(match[1] + ".", style, startX, cursorY); // Render number
+                    // Use sync helper or async text? renderText is now async.
+                    await this.renderText(match[1] + ".", style, startX, cursorY);
                     cursorX = startX + 30; // Indent
                 }
             } else {
                 cursorX = startX;
             }
 
-            // Tokenize for Bold/Italic: **bold** *italic*
-            const tokens = this.parseMarkdown(cleanLine);
+            // Tokenize for Bold/Italic/Latex
+            const tokens = this.parseRichText(cleanLine);
 
-            tokens.forEach((token) => {
+            for (const token of tokens) {
+                if (token.type === 'latex') {
+                    // Check if fit on line (for inline) or force newline (block)
+                    if (token.display) {
+                        // Block Latex: New line before and after
+                        cursorX = startX;
+                        cursorY += lineHeight;
+                        const { height } = await this.renderLatex(token.content, cursorX, cursorY, style, true);
+                        cursorY += height + 10;
+                    } else {
+                        // Inline Latex
+                        // We don't know width yet, so render offscreen first? Or just render and hope?
+                        // renderLatex renders directly.
+                        // But if it wraps? Math shouldn't wrap mid-equation usually.
+                        // If too long, maybe wrap before starting?
+                        // For now, render at current cursor.
+                        const { width } = await this.renderLatex(token.content, cursorX, cursorY, style, false);
+                        cursorX += width + 10;
+                        if (cursorX > startX + maxWidth) {
+                            // Wrap? Too late, already drew.
+                            // Ideal: measure first. But kaTeX measurements available?
+                            // MVP: Ignore wrapping for inline math or let it overflow.
+                        }
+                    }
+                    continue;
+                }
+
                 // Set font style
                 let currentFont = `${style.size}px "${style.font}", cursive`;
                 let isBold = token.type === 'bold';
 
-                // Emulate bold/italic
-                // Note: Canvas doesn't support "bold cursive" well for all google fonts, 
-                // so we use stroke for bold and skew for italic if needed.
-
                 this.ctx.font = currentFont;
                 this.ctx.fillStyle = style.color;
 
-                if (isBold) {
-                    this.ctx.lineWidth = 1;
+                if (isBold || token.type === 'bold') {
+                    this.ctx.lineWidth = 1; // thinner stroke for faux bold
                     this.ctx.strokeStyle = style.color;
                 } else {
                     this.ctx.strokeStyle = "transparent";
                 }
 
-                const words = token.text.split(" ");
+                // Italic transform is handled inside loop via ctx.transform
 
-                words.forEach((word) => {
+                // Render words
+                const words = token.content.split(" ");
+                for (const word of words) {
                     const wordWidth = this.ctx.measureText(word).width + (word.length * style.letterSpacing);
 
                     if (cursorX + wordWidth > startX + maxWidth) {
@@ -274,7 +485,6 @@ export class HandwritingEngine {
 
                     for (let i = 0; i < word.length; i++) {
                         const char = word[i];
-
                         const jitterX = (Math.random() - 0.5) * style.perturbation * 2;
                         const jitterY = (Math.random() - 0.5) * style.perturbation * 2;
                         const rotation = (Math.random() - 0.5) * (style.rotation * Math.PI / 180);
@@ -285,65 +495,111 @@ export class HandwritingEngine {
                         this.ctx.translate(cursorX + jitterX, cursorY + jitterY + baselineNoise + waveDrift);
                         this.ctx.rotate(rotation);
 
-                        // Italic simulation
                         if (token.type === 'italic') {
                             this.ctx.transform(1, 0, -0.2, 1, 0, 0);
                         }
 
                         this.ctx.fillText(char, 0, 0);
-                        if (isBold) this.ctx.strokeText(char, 0, 0); // Bold effect
+                        if (isBold) this.ctx.strokeText(char, 0, 0);
 
                         this.ctx.restore();
-
                         const charWidth = this.ctx.measureText(char).width;
                         cursorX += charWidth + style.letterSpacing + (Math.random() * style.perturbation);
                     }
-
                     cursorX += style.wordSpacing + (Math.random() * style.perturbation * 2);
-                });
-            });
+                }
+            }
 
             cursorX = startX;
             cursorY += lineHeight;
-        });
+        }
 
         return cursorY;
     }
 
-    private parseMarkdown(text: string): { type: 'normal' | 'bold' | 'italic', text: string }[] {
-        const tokens: { type: 'normal' | 'bold' | 'italic', text: string }[] = [];
-        let buffer = "";
-        let i = 0;
+    // Helper method called by renderText
+    private renderWords(text: string, style: HandwritingStyle, startX: number, maxWidth: number, lineHeight: number, currentX: number, currentY: number) {
+        let cursorX = currentX;
+        let cursorY = currentY;
+        const words = text.split(" ");
 
-        while (i < text.length) {
-            if (text.startsWith("**", i)) {
-                if (buffer) tokens.push({ type: 'normal', text: buffer });
-                buffer = "";
-                i += 2;
-                let end = text.indexOf("**", i);
-                if (end === -1) end = text.length;
-                tokens.push({ type: 'bold', text: text.substring(i, end) });
-                i = end + 2;
-            } else if (text.startsWith("*", i)) {
-                if (buffer) tokens.push({ type: 'normal', text: buffer });
-                buffer = "";
-                i += 1;
-                let end = text.indexOf("*", i);
-                if (end === -1) end = text.length;
-                tokens.push({ type: 'italic', text: text.substring(i, end) });
-                i = end + 1;
-            } else {
-                buffer += text[i];
-                i++;
+        words.forEach((word) => {
+            const wordWidth = this.ctx.measureText(word).width + (word.length * style.letterSpacing);
+
+            if (cursorX + wordWidth > startX + maxWidth) {
+                cursorX = startX;
+                cursorY += lineHeight;
             }
+
+            for (let i = 0; i < word.length; i++) {
+                const char = word[i];
+                const jitterX = (Math.random() - 0.5) * style.perturbation * 2;
+                const jitterY = (Math.random() - 0.5) * style.perturbation * 2;
+                const rotation = (Math.random() - 0.5) * (style.rotation * Math.PI / 180);
+                const baselineNoise = (Math.random() - 0.5) * style.baselineShift;
+                const waveDrift = Math.sin(cursorX / 100) * style.perturbation;
+
+                this.ctx.save();
+                this.ctx.translate(cursorX + jitterX, cursorY + jitterY + baselineNoise + waveDrift);
+                this.ctx.rotate(rotation);
+                this.ctx.fillText(char, 0, 0);
+                this.ctx.restore();
+
+                const charWidth = this.ctx.measureText(char).width;
+                cursorX += charWidth + style.letterSpacing + (Math.random() * style.perturbation);
+            }
+            cursorX += style.wordSpacing + (Math.random() * style.perturbation * 2);
+        });
+
+        return { x: cursorX, y: cursorY };
+    }
+
+    private parseRichText(text: string): { type: 'text' | 'bold' | 'italic' | 'latex', content: string, display?: boolean }[] {
+        const tokens: { type: 'text' | 'bold' | 'italic' | 'latex', content: string, display?: boolean }[] = [];
+        // Combined regex for Latex ($$ or \[ or \( or $), Bold (**), Italic (*)
+        const regex = /(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\])|(\\\([\s\S]+?\\\)|\\\$[\s\S]+?\\\$|\$[^$]+?\$)|(\*\*[^*]+\*\*)|(\*[^*]+\*)/g;
+
+        let lastIndex = 0;
+        let match;
+
+        while ((match = regex.exec(text)) !== null) {
+            // Text before match
+            if (match.index > lastIndex) {
+                tokens.push({ type: 'text', content: text.substring(lastIndex, match.index) });
+            }
+
+            if (match[1]) {
+                // Block Latex (strip delimiters)
+                let content = match[1];
+                if (content.startsWith('$$')) content = content.slice(2, -2);
+                else if (content.startsWith('\\[')) content = content.slice(2, -2);
+                tokens.push({ type: 'latex', content, display: true });
+            } else if (match[2]) {
+                // Inline Latex
+                let content = match[2];
+                if (content.startsWith('\\(')) content = content.slice(2, -2);
+                else if (content.startsWith('$')) content = content.slice(1, -1);
+                tokens.push({ type: 'latex', content, display: false });
+            } else if (match[3]) {
+                // Bold
+                tokens.push({ type: 'bold', content: match[3].slice(2, -2) });
+            } else if (match[4]) {
+                // Italic
+                tokens.push({ type: 'italic', content: match[4].slice(1, -1) });
+            }
+
+            lastIndex = regex.lastIndex;
         }
-        if (buffer) tokens.push({ type: 'normal', text: buffer });
+
+        if (lastIndex < text.length) {
+            tokens.push({ type: 'text', content: text.substring(lastIndex) });
+        }
         return tokens;
     }
 
     // Render exam-style answer with strict margin logic
     // Returns next generic Y position
-    renderExamQuestion(
+    async renderExamQuestion(
         qNum: string,
         questionText: string,
         answerText: string,
@@ -356,43 +612,44 @@ export class HandwritingEngine {
         const contentX = marginX + 20;
 
         // Draw Q# to LEFT of margin
-        this.renderText(qNum, { ...style, size: style.size * 1.1, color: "#ef4444" }, marginX - 45, currentY);
+        await this.renderText(qNum, { ...style, size: style.size * 1.1, color: "#ef4444" }, marginX - 45, currentY);
 
         // Draw "Ans:" + Question Text to RIGHT of margin
-        currentY = this.renderRichText(`Ans: ${questionText}`, { ...style, color: "#64748b" }, contentX, currentY);
+        // Using darker slate for better visibility
+        currentY = await this.renderRichText(`Ans: ${questionText}`, { ...style, color: "#334155" }, contentX, currentY);
         currentY += style.size * 0.5; // Gap
 
         // Draw Answer Step-by-Step
         const steps = answerText.split("\n");
 
-        steps.forEach((step) => {
+        for (const step of steps) {
             // Correction Simulation: Randomly strike through words (1% chance)
             if (Math.random() > 0.99) {
-                this.simulateCorrection(contentX, currentY, style);
+                await this.simulateCorrection(contentX, currentY, style);
                 currentY += style.size * 1.2;
             }
 
             // Render formatted steps
             if (step.startsWith("Step") || step.startsWith("Given") || step.startsWith("Therefore")) {
-                currentY = this.renderRichText(step, { ...style, color: "#000" }, contentX, currentY);
+                currentY = await this.renderRichText(step, { ...style, color: "#000" }, contentX, currentY);
             } else if (step.startsWith("Final Answer")) {
                 // Underline final answer
-                const finalY = this.renderRichText(step, style, contentX, currentY);
+                const finalY = await this.renderRichText(step, style, contentX, currentY);
                 this.drawUnderline(contentX, finalY - 5, 200); // Approximate width
                 currentY = finalY;
             } else {
-                currentY = this.renderRichText(step, style, contentX, currentY);
+                currentY = await this.renderRichText(step, style, contentX, currentY);
             }
-        });
+        }
 
         return currentY + 40; // Gap between questions
     }
 
-    private simulateCorrection(x: number, y: number, style: HandwritingStyle) {
+    private async simulateCorrection(x: number, y: number, style: HandwritingStyle) {
         // Write "mistake"
         const mistakeText = "wronng value";
         const width = this.ctx.measureText(mistakeText).width;
-        this.renderText(mistakeText, style, x, y);
+        await this.renderText(mistakeText, style, x, y);
 
         // Scratch it out
         this.ctx.beginPath();

@@ -179,11 +179,11 @@ export default function CanvasInteractionLayer({ width, height, scale }: CanvasI
             {/* Toolbar - Floats above canvas */}
             <div className="absolute top-4 right-4 bg-gray-900/90 border border-white/20 p-2 rounded-xl backdrop-blur-md flex flex-col gap-2 shadow-2xl pointer-events-auto z-50">
                 <div className="grid grid-cols-2 gap-2">
-                    <ToolBtn active={currentTool === "pen"} onClick={() => setCurrentTool("pen")} icon={Pen} />
-                    <ToolBtn active={currentTool === "eraser"} onClick={() => setCurrentTool("eraser")} icon={Eraser} />
-                    <ToolBtn active={currentTool === "line"} onClick={() => setCurrentTool("line")} icon={Minus} className="rotate-45" />
-                    <ToolBtn active={currentTool === "rect"} onClick={() => setCurrentTool("rect")} icon={Square} />
-                    <ToolBtn active={currentTool === "circle"} onClick={() => setCurrentTool("circle")} icon={Circle} />
+                    <ToolBtn active={currentTool === "pen"} onClick={() => setCurrentTool("pen")} icon={Pen} label="Pen" />
+                    <ToolBtn active={currentTool === "eraser"} onClick={() => setCurrentTool("eraser")} icon={Eraser} label="Eraser" />
+                    <ToolBtn active={currentTool === "line"} onClick={() => setCurrentTool("line")} icon={Minus} className="rotate-45" label="Line" />
+                    <ToolBtn active={currentTool === "rect"} onClick={() => setCurrentTool("rect")} icon={Square} label="Rectangle" />
+                    <ToolBtn active={currentTool === "circle"} onClick={() => setCurrentTool("circle")} icon={Circle} label="Circle" />
                 </div>
 
                 <div className="h-px bg-white/20 my-1" />
@@ -193,6 +193,8 @@ export default function CanvasInteractionLayer({ width, height, scale }: CanvasI
                     value={brushColor}
                     onChange={(e) => setBrushColor(e.target.value)}
                     className="w-full h-8 rounded cursor-pointer bg-transparent"
+                    aria-label="Brush Color"
+                    title="Brush Color"
                 />
                 <input
                     type="range"
@@ -200,14 +202,16 @@ export default function CanvasInteractionLayer({ width, height, scale }: CanvasI
                     value={brushSize}
                     onChange={(e) => setBrushSize(Number(e.target.value))}
                     className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                    aria-label="Brush Size"
+                    title="Brush Size"
                 />
 
                 <div className="h-px bg-white/20 my-1" />
 
                 <div className="flex justify-between gap-1">
-                    <ActionBtn onClick={undo} icon={Undo} />
-                    <ActionBtn onClick={redo} icon={Redo} />
-                    <ActionBtn onClick={clear} icon={Trash2} color="text-red-400" />
+                    <ActionBtn onClick={undo} icon={Undo} label="Undo" />
+                    <ActionBtn onClick={redo} icon={Redo} label="Redo" />
+                    <ActionBtn onClick={clear} icon={Trash2} color="text-red-400" label="Clear Canvas" />
                 </div>
             </div>
 
@@ -229,18 +233,22 @@ export default function CanvasInteractionLayer({ width, height, scale }: CanvasI
     );
 }
 
-const ToolBtn = ({ active, onClick, icon: Icon, className = "" }: any) => (
+const ToolBtn = ({ active, onClick, icon: Icon, className = "", label }: any) => (
     <button
         onClick={onClick}
+        aria-label={label}
+        title={label}
         className={`p-2 rounded-lg transition-all ${active ? "bg-holoCyan text-deepSpace" : "bg-white/5 text-gray-400 hover:bg-white/10"} ${className}`}
     >
         <Icon size={18} />
     </button>
 );
 
-const ActionBtn = ({ onClick, icon: Icon, color = "text-gray-400" }: any) => (
+const ActionBtn = ({ onClick, icon: Icon, color = "text-gray-400", label }: any) => (
     <button
         onClick={onClick}
+        aria-label={label}
+        title={label}
         className={`p-2 rounded-lg hover:bg-white/10 ${color}`}
     >
         <Icon size={16} />

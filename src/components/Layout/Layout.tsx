@@ -13,7 +13,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     const navItems = [
         { name: "Create", href: "/", icon: Sparkles },
         { name: "Library", href: "/notes", icon: FileText },
-        { name: "Settings", href: "/calibrate", icon: Settings },
+        { name: "Calibrate", href: "/calibrate", icon: Settings },
     ];
 
     return (
@@ -44,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             <Sparkles size={20} className="text-deepSpace" />
                         </motion.div>
                         <span className="text-xl font-bold holo-gradient-text">
-                            Antigravity
+                            AntiGravity
                         </span>
                     </Link>
 
@@ -96,7 +96,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             {/* Footer */}
             <footer className="relative z-10 border-t border-white/10 frosted-panel mt-20">
                 <div className="max-w-7xl mx-auto px-6 py-8 text-center text-sm text-gray-400">
-                    <p>© 2026 Antigravity. Defying gravity, one note at a time.</p>
+                    <p>© 2026 AntiGravity. Defying gravity, one note at a time.</p>
                 </div>
             </footer>
         </div>

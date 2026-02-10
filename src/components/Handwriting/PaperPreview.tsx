@@ -52,21 +52,28 @@ const PaperPreview = forwardRef<PaperPreviewHandle, PaperPreviewProps>(({ conten
             height: canvas.height,
             marginLeft: 60,
             marginTop: 80,
+            paperColor: controls.paperColor,
+            marginColor: controls.marginColor
         };
 
         const engine = new HandwritingEngine(ctx, canvas.width, canvas.height);
 
-        // Clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Cancellation flag to prevent stale updates
+        let isCancelled = false;
 
-        // Draw paper and render text
-        requestAnimationFrame(() => {
+        const render = async () => {
+            // Draw paper (synchronous part)
+            // Ideally clear canvas first
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             engine.drawPaper(pageConfig);
+
+            if (isCancelled) return;
 
             if (isExamMode) {
                 try {
                     const data = JSON.parse(content);
-                    engine.renderExamQuestion(
+                    // Render exam question asynchronously
+                    await engine.renderExamQuestion(
                         data.qNum,
                         data.qText,
                         data.ans,
@@ -75,12 +82,20 @@ const PaperPreview = forwardRef<PaperPreviewHandle, PaperPreviewProps>(({ conten
                         pageConfig.marginTop
                     );
                 } catch (e) {
-                    engine.renderRichText(content, style, pageConfig.marginLeft + 20, pageConfig.marginTop);
+                    // Fallback to rich text
+                    if (!isCancelled) await engine.renderRichText(content, style, pageConfig.marginLeft + 20, pageConfig.marginTop);
                 }
             } else {
-                engine.renderRichText(content, style, pageConfig.marginLeft + 20, pageConfig.marginTop);
+                // Render rich text asynchronously
+                await engine.renderRichText(content, style, pageConfig.marginLeft + 20, pageConfig.marginTop);
             }
-        });
+        };
+
+        render();
+
+        return () => {
+            isCancelled = true;
+        };
 
     }, [content, controls, isExamMode]);
 

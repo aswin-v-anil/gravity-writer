@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pen, Type, AlignLeft, RotateCcw, Palette, FileText, MoveHorizontal, ArrowUpFromLine, Layers } from "lucide-react";
+import { Pen, Type, AlignLeft, RotateCcw, Palette, FileText, MoveHorizontal, ArrowUpFromLine, Layers, Droplet } from "lucide-react";
 
 export interface HandwritingControls {
     // Handwriting Style
@@ -21,6 +21,12 @@ export interface HandwritingControls {
     // Paper
     paperType: "plain" | "ruled" | "grid" | "vintage";
     paperColor: string;
+    marginColor: string;
+
+    // Advanced Effects (HW Settings)
+    inkBlur: number;
+    inkFlow: number;
+    paperTexture: number;
 }
 
 interface ControlsPanelProps {
@@ -71,7 +77,7 @@ const Slider = ({
 );
 
 export default function ControlsPanel({ controls, onChange }: ControlsPanelProps) {
-    const [activeTab, setActiveTab] = useState<"style" | "spacing" | "paper">("style");
+    const [activeTab, setActiveTab] = useState<"style" | "spacing" | "paper" | "effects">("style");
 
     const update = (key: keyof HandwritingControls, value: any) => {
         onChange({ ...controls, [key]: value });
@@ -89,22 +95,22 @@ export default function ControlsPanel({ controls, onChange }: ControlsPanelProps
         { name: "Just Another Hand", value: "Just Another Hand" },
         { name: "Nothing You Could Do", value: "Nothing You Could Do" },
         { name: "Covered By Your Grace", value: "Covered By Your Grace" },
-        
+
         // Cursive / Elegant
         { name: "Dancing Script", value: "Dancing Script" },
         { name: "Shadows Into Light", value: "Shadows Into Light" },
         { name: "Sacramento", value: "Sacramento" },
         { name: "Zeyada", value: "Zeyada" },
         { name: "Homemade Apple", value: "Homemade Apple" },
-        
+
         // Bold / Marker
         { name: "Permanent Marker", value: "Permanent Marker" },
         { name: "Walter Turncoat", value: "Walter Turncoat" },
-        
+
         // Academic / Clean
         { name: "Architects Daughter", value: "Architects Daughter" },
         { name: "Schoolbell", value: "Schoolbell" },
-        
+
         // Additional Handwriting Fonts
         { name: "Satisfy", value: "Satisfy" },
         { name: "Amatic SC", value: "Amatic SC" },
@@ -131,13 +137,14 @@ export default function ControlsPanel({ controls, onChange }: ControlsPanelProps
                     { id: "style", icon: Pen, label: "Style" },
                     { id: "spacing", icon: AlignLeft, label: "Spacing" },
                     { id: "paper", icon: FileText, label: "Paper" },
+                    { id: "effects", icon: Droplet, label: "Effects" },
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as any)}
                         className={`flex-1 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === tab.id
-                                ? "bg-white/10 text-holoCyan border-b-2 border-holoCyan"
-                                : "text-gray-400 hover:text-white hover:bg-white/5"
+                            ? "bg-white/10 text-holoCyan border-b-2 border-holoCyan"
+                            : "text-gray-400 hover:text-white hover:bg-white/5"
                             }`}
                     >
                         <tab.icon size={16} />
@@ -278,24 +285,106 @@ export default function ControlsPanel({ controls, onChange }: ControlsPanelProps
                             className="space-y-6"
                         >
                             <div className="grid grid-cols-2 gap-3">
-                                {paperTypes.map((paper) => (
+                                {[
+                                    { id: "plain", name: "Plain" },
+                                    { id: "ruled", name: "Ruled" },
+                                    { id: "grid", name: "Grid" },
+                                    { id: "vintage", name: "Vintage" },
+                                ].map((paper) => (
                                     <button
-                                        key={paper.value}
-                                        onClick={() => update("paperType", paper.value)}
-                                        className={`py-6 px-3 rounded-xl text-sm font-medium transition-all flex flex-col items-center gap-2 border ${controls.paperType === paper.value
-                                                ? "bg-holoCyan/20 border-holoCyan text-paperWhite shadow-[0_0_15px_rgba(0,217,255,0.3)]"
-                                                : "bg-white/5 border-white/10 text-gray-400 hover:bg-white/10"
+                                        key={paper.id}
+                                        onClick={() => update("paperType", paper.id)}
+                                        className={`px-4 py-3 rounded-lg text-sm font-medium transition-all border ${controls.paperType === paper.id
+                                                ? "bg-holoCyan/20 text-holoCyan border-holoCyan"
+                                                : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10"
                                             }`}
                                     >
-                                        <Layers size={20} />
                                         {paper.name}
                                     </button>
                                 ))}
+                            </div>
+
+                            {/* Colors */}
+                            <div className="space-y-4 pt-4 border-t border-white/10">
+                                <div className="space-y-2">
+                                    <label className="text-sm text-gray-400 flex items-center gap-2">
+                                        <Palette size={14} /> Paper Color
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="color"
+                                            value={controls.paperColor}
+                                            onChange={(e) => update("paperColor", e.target.value)}
+                                            className="h-10 w-12 rounded bg-transparent border border-white/10 cursor-pointer"
+                                        />
+                                        <span className="text-xs text-gray-500 font-mono">{controls.paperColor}</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm text-gray-400 flex items-center gap-2">
+                                        <AlignLeft size={14} /> Margin Color
+                                    </label>
+                                    <div className="flex items-center gap-3">
+                                        <input
+                                            type="color"
+                                            value={controls.marginColor}
+                                            onChange={(e) => update("marginColor", e.target.value)}
+                                            className="h-10 w-12 rounded bg-transparent border border-white/10 cursor-pointer"
+                                        />
+                                        <span className="text-xs text-gray-500 font-mono">{controls.marginColor}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {activeTab === "effects" && (
+                        <motion.div
+                            key="effects"
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 10 }}
+                            className="space-y-6"
+                        >
+                            <Slider
+                                label="Ink Blur"
+                                icon={Droplet}
+                                value={controls.inkBlur}
+                                min={0}
+                                max={2}
+                                step={0.1}
+                                onChange={(v) => update("inkBlur", v)}
+                                unit="px"
+                            />
+
+                            <Slider
+                                label="Ink Flow Variation"
+                                icon={Droplet}
+                                value={controls.inkFlow}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                onChange={(v) => update("inkFlow", v)}
+                            />
+
+                            <Slider
+                                label="Paper Texture"
+                                icon={Layers}
+                                value={controls.paperTexture}
+                                min={0}
+                                max={1}
+                                step={0.05}
+                                onChange={(v) => update("paperTexture", v)}
+                            />
+
+                            <div className="text-xs text-gray-500 mt-4 p-3 bg-white/5 rounded-lg">
+                                These effects add realism by simulating pen pressure and paper grain.
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
-        </div>
+        </div >
     );
 }
